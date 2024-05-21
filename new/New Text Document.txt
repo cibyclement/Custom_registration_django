@@ -1,0 +1,242 @@
+view.py
+
+from django.shortcuts import render
+from django.shortcuts import render,redirect
+from django.contrib.auth import authenticate,login,logout
+from .forms import CustomUserCreationForm
+from django.contrib import messages
+from .models import  *
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+
+
+
+def base(request):
+    return render(request,'base.html')
+
+def dashboard(request):
+    return render(request,'mainpage/main.html')
+
+def loginpage(request):
+    if request.method == 'POST':
+        username = request.POST['username']
+        password = request.POST['password']
+        
+        # Check if a user with the provided username exists
+        try:
+            user = CustomUser.objects.get(username=username)
+            print(user)
+        except CustomUser.DoesNotExist:
+            user = None
+
+        # Authenticate the user
+        if user is not None:
+            authenticated_user = authenticate(username=username, password=password)
+            if authenticated_user is not None:
+                login(request, authenticated_user)
+                messages.success(request, "Login successful")
+                return redirect('dashboard')
+            else:
+                messages.error(request, "Incorrect password")
+                return redirect('loginpage')
+        else:
+            messages.error(request, "User does not exist")
+            return redirect('loginpage')
+
+    return render(request, 'mainpage/authentications/login.html')
+
+def logoutpage(request):
+    logout(request)
+    messages.success(request, "Logout successful")
+    return redirect('dashboard')
+
+
+def registerpage(request):
+    if request.method =='POST':
+        form=CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user=form.save(commit=False)
+            user.username=user.username.lower()
+            user.save()
+            login(request,user)
+            messages.success(request, "Login successful")
+            return redirect('loginpage')
+        else:
+            messages.error(request,"error accurred in registration")
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+    else:
+        form = CustomUserCreationForm()    
+    return render(request,'mainpage/authentications/register.html',{'form':form})
+
+
+def loginpage2(request):
+    if request.method == 'POST':
+        username = request.POST['username']
+        password = request.POST['password']
+        # Check if a user with the provided username exists
+        try:
+            user = CustomUser.objects.get(username=username)
+            print(user)
+        except CustomUser.DoesNotExist:
+            user = None
+
+        # Authenticate the user
+        if user is not None:
+            authenticated_user = authenticate(username=username, password=password)
+            if authenticated_user is not None:
+                login(request, authenticated_user)
+                messages.success(request, "Login successful")
+                return redirect('dashboard')
+            else:
+                messages.error(request, "Incorrect password")
+                return redirect('loginpage')
+        else:
+            messages.error(request, "User does not exist")
+            return redirect('loginpage')
+    return render(request,'mainpage/authentications/login2.html')
+
+def dashboard_analytics(request):
+
+    return render(request,'mainpage/dashboard/dashboard-analytics.html')
+
+def dashboard_sales(request):
+
+    return render(request,'mainpage/dashboard/dashboard-sales.html')
+
+def dashboard_saas(request):
+
+    return render(request,'mainpage/dashboard/dashboard-saas.html')
+
+def dashboard_system(request):
+
+    return render(request,'mainpage/dashboard/dashboard-system.html')
+
+
+module.py______________________
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.db import models
+from django.utils import timezone
+
+
+
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, phone, username, password=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        username = self.model.normalize_username(username) 
+        user = self.model(email=email, phone=phone, username=username, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, phone, username, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return self.create_user(email, phone, username, password, **extra_fields)
+    
+
+class CustomUser(AbstractBaseUser):
+    USER_TYPE= (
+        (1,"superuser"),
+        (2,"admin"),
+        (3,"user"),
+    )
+    email = models.EmailField(default=True,null=False)
+    phone = models.CharField(max_length=15)
+    username = models.CharField(max_length=100, unique=True)
+    name=models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    date_joined = models.DateTimeField(default=timezone.now)
+    usertype = models.IntegerField(choices=USER_TYPE)
+    is_superuser=models.BooleanField(default=False)
+    last_login=models.DateTimeField(blank=True,null=True)
+    
+    objects = CustomUserManager()
+
+    USERNAME_FIELD = 'username'  # Set username field as the unique identifier
+    REQUIRED_FIELDS = ['email', 'phone']
+
+    def __str__(self):
+        return self.username
+    
+    @property
+    def user_type(self):
+        return self.usertype
+________________________________
+from.py
+
+
+from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from .models import CustomUser
+
+class CustomUserCreationForm(UserCreationForm):
+    USER_TYPE= (
+    (1,"superuser"),
+    (2,"admin"),
+    (3,"user"),
+    )
+
+    email = forms.EmailField(widget=forms.TextInput(attrs={'class': 'form-control'}))
+    username = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control'}))
+    name = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control'}))
+    email = forms.EmailField(widget=forms.TextInput(attrs={'class': 'form-control'}))
+    phone = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control'}))
+    password1 = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control'}))
+    password2 = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control'}))
+    usertype = forms.ChoiceField(choices=USER_TYPE, widget=forms.Select(attrs={'class': 'form-control'}))
+    class Meta(UserCreationForm.Meta):
+        model = CustomUser
+        fields = ('username','name', 'email', 'phone', 'password1', 'password2', 'usertype')
+
+
+    # def clean_email(self):
+    #     email = self.cleaned_data.get('email')
+    #     if not email.endswith('@gamil.com'):
+    #         raise forms.ValidationError("Please use an email address ending with '@gmail.com'")
+    #     return email
+
+    # def clean_phone(self):
+    #     phone = self.cleaned_data.get('phone')
+    #     if not phone.startswith('+'):
+    #         raise forms.ValidationError("Phone number must start with a country code preceded by a '+'")
+    #     return phone
+
+    def clean_usertype(self):
+        usertype = self.cleaned_data.get('usertype')
+        if usertype not in [1, 2, 3]:  
+            raise forms.ValidationError("Invalid user type")
+        return usertype
+
+
+
+
+urls.py ----app
+
+from django.urls import path
+from . import views
+urlpatterns = [
+    path('base',views.base,name="base"),
+    path('',views.dashboard,name="dashboard"),
+    path('register',views.registerpage, name='register'),
+    path('loginpage',views.loginpage, name='loginpage'),
+    path('logout',views.logoutpage, name='logout'), 
+    path('login2',views.loginpage2,name="login2"),
+    path('dashboard_analytics',views.dashboard_analytics,name='dashboard_analytics'),
+    path('dashboard_sales',views.dashboard_sales,name='dashboard_sales'),
+    path('dashboard_saas',views.dashboard_saas,name='dashboard_saas'),
+    path('dashboard_system',views.dashboard_system,name='dashboard_system'),
+    
+]
+
+
